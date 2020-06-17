@@ -416,6 +416,7 @@ interactions::interact_plot(sentiment_glm_retweets_nationalism,
 
 trump_approval<-read.csv("https://projects.fivethirtyeight.com/trump-approval-data/approval_topline.csv")
 
+#######CONVERTING FACTOR -> CHARACTER -> DATE ########
 trump_approval = trump_approval %>%
   mutate(date = levels(modeldate)[as.numeric(modeldate)],
          date_lubridate = as.Date(date, format = "%m/%d/%Y"))
@@ -556,19 +557,3 @@ disapproval_topics_sentiment_lm %>%
     guides(fill = guide_legend('Nationalism'),linetype = guide_legend('Nationalism')) + 
     labs(x = 'Positive word count', y = 'Disapproval Rating')
 
-
-
-# 
-# trump_documents_sentiment %>%
-#   ggplot(.) +
-#   geom_line(aes(x = date, y = nationalism*100), alpha = .5)+
-#   geom_ribbon(aes(x = date, ymin = disapproval_lo, ymax = disapproval_hi), 
-#               fill = 'red3', alpha = .3) +
-#   geom_line(aes(x = date, y = disapproval), color = 'red3') + 
-#   labs(x = 'Date in day', y = 'Disapproval Percent') + 
-#   scale_y_continuous(sec.axis = sec_axis(~.*.01, name = "Tweet loadings on Nationalism"))
-#   
-
-
-
-  #geom_line(aes(x = date, y = negative)) 
