@@ -16,6 +16,7 @@ tidy_trump_tweets %>%
   count(word) %>%
   arrange(desc(n))
 
+#removing stop words
 data("stop_words")
 tidy_trump_tweets<-tidy_trump_tweets %>%
   anti_join(stop_words)
@@ -24,7 +25,7 @@ tidy_trump_tweets %>%
   count(word) %>%
   arrange(desc(n))
 
-
+#Stemming 
 tidy_trump_tweets<-tidy_trump_tweets %>%
   mutate_at("word", funs(wordStem((.), language="en")))
 
@@ -36,7 +37,7 @@ tidy_trump_tweets %>%
 
 library(ggplot2)
 
-
+#removal of twitter-specific language
 top_words<-
   tidy_trump_tweets %>%
   anti_join(stop_words) %>%
@@ -46,6 +47,7 @@ top_words<-
              word=="amp")) %>%
   count(word) %>%
   arrange(desc(n))
+
 
 top_words %>%
   slice(1:20) %>%
@@ -63,12 +65,11 @@ top_words %>%
 
 
 
-
+#Re-dating the tweets
 tidy_trump_tweets$date<-as.Date(tidy_trump_tweets$created_at, 
                                 format="%Y-%m-%d %x")
 
-
-
+#sentiment analysis using dictionary
 trump_tweet_sentiment <- tidy_trump_tweets %>%
   filter(!(word=="https"|
              word=="rt"|
@@ -105,7 +106,7 @@ tidy_trump_DTM<-
   cast_dtm(created_at, word, n)
 
 
-
+######## COLLAPSING ALL TWEETS IN 1 DAY INTO A SINGLE "DOCUMENT" ########
 tidy_trump_DTM_byday <-
   tidy_trump_tweets %>%
   filter(!(word=="https"|
@@ -118,7 +119,7 @@ tidy_trump_DTM_byday <-
 
 
 
-
+#topic modelling with 5 topics on day-to-day tweets
 trump_topic_model<-LDA(tidy_trump_DTM_byday, k=5, control = list(seed = 321))
 
 trump_topics <- tidy(trump_topic_model, matrix = "beta")
@@ -131,21 +132,25 @@ trump_top_terms <-
   arrange(topic, -beta)
 
 
-trump_top_terms %>%
-  mutate(term = reorder(term, beta)) %>%
-  ggplot(aes(term, beta, fill = factor(topic))) +
-  geom_col(show.legend = FALSE) +
-  facet_wrap(~ topic, scales = "free") +
-  coord_flip()
 
 #topic 1: taxes 
 #topic 2: nationalism
 #topic 3: election
 #topic 4: immigration
 #topic 5: foreign affairs
+trump_top_terms %>%
+  mutate(term = reorder(term, beta),
+         topic = factor(topic, levels = c(1:5),
+                        labels = c('taxes','nationalism','election',
+                                   'immigration','foreign affairs'))) %>%
+  ggplot(aes(term, beta, fill = topic)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  coord_flip()
 
 
 
+####### COMBINING SENTIMENT ANALYSES & TOPIC MODELLING ######
 trump_tweet_sentiment <- tidy_trump_tweets %>%
   inner_join(get_sentiments("bing")) %>%
   group_by(date, sentiment, .drop = FALSE)%>%
@@ -182,18 +187,24 @@ trump_documents_sentiment = trump_tweet_sentiment_full %>%
 
 head(trump_documents_sentiment)
 
+####### TWEETS ABOUT IMMIGRATION TENDS TO USE MORE POSITIVE LANGUAGE ########
 g1 = glm(positive ~ nationalism + election + immigration + 
            foreign_affairs + taxes, trump_documents_sentiment, 
              family = 'poisson')
 summary(g1)
 
 
+####### TWEETS ABOUT IMMIGRATION & ELECTION TENDS TO USE MORE NEGATIVE LANGUAGE ########
 g2 = glm(negative ~ nationalism + election + immigration + 
            foreign_affairs + taxes , trump_documents_sentiment, 
          family = 'poisson')
 summary(g2)
 
 
+
+
+
+####### ANALYZING RETWEET & LIKE DATA ########
 trump_documents_sentiment
 
 tidy_trump_likes_retweets = trumptweets %>%
@@ -292,7 +303,7 @@ interactions::interact_plot(sentiment_glm_likes_taxes,
 
 
 
-
+######################## POSITIVE COVERAGE OF NATIONALISM IS LIKED ON TWITTER #############################
 ####PREDICTING LIKES: SENTIMENTS*NATIONALISM(TOPIC)
 sentiment_glm_likes_nationalism = glm(likes ~ positive*nationalism + negative*nationalism, 
                                 trump_documents_sentiment,
@@ -462,6 +473,7 @@ ggeffects::ggpredict(approval_topics_lm, c('immigration')) %>%
 
 
 
+######################## POSITIVE COVERAGE OF NATIONALISM LEADS TO WORSE APPROVAL RATINGS #############################
 ####PREDICTING APPROVAL ESTIMATES FROM TOPICS*SENTIMENTS
 approval_topics_sentiment_lm = 
   lm(approval ~ nationalism*positive + nationalism*negative + immigration + taxes + election + 
@@ -473,9 +485,22 @@ interactions::interact_plot(approval_topics_sentiment_lm,
 
 
 disapproval_topics_sentiment_lm = 
-  lm(disapproval ~ nationalism*positive + nationalism*negative + immigration + taxes + election + 
+  lm(disapproval ~ nationalism*positive + nationalism*negative +
+       immigration + taxes + election + 
        foreign_affairs, trump_documents_sentiment)
 summary(disapproval_topics_sentiment_lm)
 
 interactions::interact_plot(disapproval_topics_sentiment_lm,
                             pred = 'positive', modx = 'nationalism', interval = T)
+
+
+trump_documents_sentiment %>%
+  ggplot(.) +
+  geom_line(aes(x = date, y = nationalism*100), alpha = .5)+
+  geom_ribbon(aes(x = date, ymin = disapproval_lo, ymax = disapproval_hi), 
+              fill = 'red3', alpha = .3) +
+  geom_line(aes(x = date, y = disapproval), color = 'red3') + 
+  labs(x = 'Date in day', y = 'Disapproval Percent') + 
+  scale_y_continuous(sec.axis = sec_axis(~.*.01, name = "Tweet loadings on Nationalism"))
+  
+  #geom_line(aes(x = date, y = negative)) 
