@@ -187,11 +187,40 @@ trump_documents_sentiment = trump_tweet_sentiment_full %>%
 
 head(trump_documents_sentiment)
 
-####### TWEETS ABOUT IMMIGRATION TENDS TO USE MORE POSITIVE LANGUAGE ########
+
+####### EVOLUTION OF TOPICS OVER TIME ########
+test1 = trump_documents_topic %>%
+  ungroup() %>%
+  mutate(document = as.Date(document, format = "%Y-%m-%d"),
+           date = floor_date(document,
+                           "month")) %>%
+  group_by(date,topic) %>%
+  summarise(gamma = mean(gamma,na.rm =T))
+
+test1 %>%
+  mutate(topic = factor(topic, levels = c(1:5),
+                labels = c('taxes','nationalism','election',
+                           'immigration','foreign affairs')))  %>%  
+  ggplot(.) +
+  geom_line(aes(x = date, y = gamma, color = topic))+ theme_minimal()
+  
+
+
+  
+  ####### TWEETS ABOUT IMMIGRATION TENDS TO USE MORE POSITIVE LANGUAGE ########
 g1 = glm(positive ~ nationalism + election + immigration + 
            foreign_affairs + taxes, trump_documents_sentiment, 
              family = 'poisson')
 summary(g1)
+
+ggeffects::ggpredict(g1, c('immigration')) %>%
+  data.frame() %>%
+  ggplot(.) + 
+  geom_ribbon(aes(x = x, ymin = conf.low, ymax = conf.high), alpha = .5, fill = 'darkgoldenrod1') +
+  geom_line(aes(x = x, y = predicted)) + 
+  labs(x = 'Document loading on Immigration Topic',
+       y = 'Counts of positive words') + theme_minimal() 
+  
 
 
 ####### TWEETS ABOUT IMMIGRATION & ELECTION TENDS TO USE MORE NEGATIVE LANGUAGE ########
@@ -201,8 +230,22 @@ g2 = glm(negative ~ nationalism + election + immigration +
 summary(g2)
 
 
+ggeffects::ggpredict(g2, c('immigration')) %>%
+  data.frame() %>%
+  ggplot(.) + 
+  geom_ribbon(aes(x = x, ymin = conf.low, ymax = conf.high), alpha = .5, fill = 'dodgerblue') +
+  geom_line(aes(x = x, y = predicted)) + 
+  labs(x = 'Document loading on Immigration Topic',
+       y = 'Counts of negative words') + theme_minimal() 
 
 
+ggeffects::ggpredict(g2, c('election')) %>%
+  data.frame() %>%
+  ggplot(.) + 
+  geom_ribbon(aes(x = x, ymin = conf.low, ymax = conf.high), alpha = .5, fill = 'dodgerblue') +
+  geom_line(aes(x = x, y = predicted)) + 
+  labs(x = 'Document loading on Election Topic',
+       y = 'Counts of negative words') + theme_minimal() 
 
 ####### ANALYZING RETWEET & LIKE DATA ########
 trump_documents_sentiment
@@ -311,6 +354,16 @@ sentiment_glm_likes_nationalism = glm(likes ~ positive*nationalism + negative*na
 summary(sentiment_glm_likes_nationalism)
 interactions::interact_plot(sentiment_glm_likes_nationalism, 
                             pred = 'positive', modx = 'nationalism')
+
+sentiment_glm_likes_nationalism %>%
+  ggeffects::ggpredict(., c('positive', 'nationalism [.1, .5, .9]')) %>%
+  data.frame() %>%
+  ggplot(.) +
+  geom_ribbon(aes(x = x, ymin = conf.low, ymax = conf.high, fill = group), alpha = .3) +
+  geom_line(aes(x = x, y = predicted, group = group, linetype = group)) +
+  theme_minimal() + 
+  guides(fill = guide_legend('Nationalism'),linetype = guide_legend('Nationalism')) + 
+  labs(x = 'Positive word count', y = 'Like count')
 
 
 
@@ -493,14 +546,29 @@ summary(disapproval_topics_sentiment_lm)
 interactions::interact_plot(disapproval_topics_sentiment_lm,
                             pred = 'positive', modx = 'nationalism', interval = T)
 
+disapproval_topics_sentiment_lm %>%
+  ggeffects::ggpredict(., c('positive', 'nationalism [.1, .5, .9]')) %>%
+    data.frame() %>%
+    ggplot(.) +
+    geom_ribbon(aes(x = x, ymin = conf.low, ymax = conf.high, fill = group), alpha = .3) +
+    geom_line(aes(x = x, y = predicted, group = group, linetype = group)) +
+    theme_minimal() + 
+    guides(fill = guide_legend('Nationalism'),linetype = guide_legend('Nationalism')) + 
+    labs(x = 'Positive word count', y = 'Disapproval Rating')
 
-trump_documents_sentiment %>%
-  ggplot(.) +
-  geom_line(aes(x = date, y = nationalism*100), alpha = .5)+
-  geom_ribbon(aes(x = date, ymin = disapproval_lo, ymax = disapproval_hi), 
-              fill = 'red3', alpha = .3) +
-  geom_line(aes(x = date, y = disapproval), color = 'red3') + 
-  labs(x = 'Date in day', y = 'Disapproval Percent') + 
-  scale_y_continuous(sec.axis = sec_axis(~.*.01, name = "Tweet loadings on Nationalism"))
-  
+
+
+# 
+# trump_documents_sentiment %>%
+#   ggplot(.) +
+#   geom_line(aes(x = date, y = nationalism*100), alpha = .5)+
+#   geom_ribbon(aes(x = date, ymin = disapproval_lo, ymax = disapproval_hi), 
+#               fill = 'red3', alpha = .3) +
+#   geom_line(aes(x = date, y = disapproval), color = 'red3') + 
+#   labs(x = 'Date in day', y = 'Disapproval Percent') + 
+#   scale_y_continuous(sec.axis = sec_axis(~.*.01, name = "Tweet loadings on Nationalism"))
+#   
+
+
+
   #geom_line(aes(x = date, y = negative)) 
