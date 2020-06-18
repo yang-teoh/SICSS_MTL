@@ -48,7 +48,7 @@ pew <- pew %>% select(qid, pew_estimate)
 
 
 ##MTURK ESTIMATES
-pew_rep = mturk %>%
+pew_rep_all = mturk %>%
  select('ALG1','SM3','alg_consumers','alg_criminaljustice','alg_job','alg_job2') %>%
   summarise_all(~mean(.,na.rm = T))
 
@@ -61,10 +61,10 @@ pewplot$sample = 'pew'
 
 pewplot2 = pewplot
 
-pewplot2$pew_estimate = c(pew_rep$ALG1,pew_rep$SM3, 
-                          pew_rep$alg_criminaljustice,
-                          pew_rep$alg_job,
-                          pew_rep$alg_job2)
+pewplot2$pew_estimate = c(pew_rep_all$ALG1,pew_rep$SM3, 
+                          pew_rep_all$alg_criminaljustice,
+                          pew_rep_all$alg_job,
+                          pew_rep_all$alg_job2)
 pewplot2$sample = 'mturk'
 
 pplot = rbind(pewplot,pewplot2)
@@ -99,6 +99,11 @@ mturk$race2<-ifelse(mturk$race=="White" & mturk$hispanic==0,"white",
                            ifelse(mturk$race=="Black or African American" & mturk$hispanic==0 | mturk$race=="White, Black or African American, Other" & mturk$hispanic==0,"black"," hispanic")))
 table(mturk$race2)
 
+mturk$region<-ifelse(mturk$state=="Rhode Island" | mturk$state=="Massachusetts" | mturk$state=="New Jersey" | mturk$state=="New York","northeast",
+                     ifelse(mturk$state=="Ohio" | mturk$state=="Illinois" | mturk$state=="Pennsylvania","midwest",
+                            ifelse(mturk$state=="Alabama" | mturk$state=="Texas" | mturk$state=="Kentucky" | mturk$state=="Louisiana"| mturk$state=="Florida" | mturk$state=="North Carolina" | mturk$state=="Tennessee" | mturk$state=="Oklahoma","south","west")))
+table(mturk$region)
+
 # get total census population
 N <- sum(census$POP)
 
@@ -132,16 +137,28 @@ pew_rep = mturk %>%
   group_by(gender,race2) %>%
   summarise_all(~mean(.,na.rm = T))
 
+pew_rep$race2 = levels(pew_rep$race2)[as.numeric(pew_rep$race2)]
+
+add = cbind(0,'other',pew_rep_all[,-3])
+add2= cbind(1,'other', pew_rep_all[,-3])
+colnames(add) = colnames(pew_rep)
+colnames(add2) = colnames(pew_rep)
+
+pew_rep = rbind(data.frame(pew_rep), data.frame(add),data.frame(add2)) %>%
+  mutate(gender =factor(gender),
+         race2 = factor(race2, levels = c("hispanic","asian","white","black",
+                                          "other"),
+                        labels = c("hispanic", "asian","white","black",
+                                   "other"))) %>%
+  arrange(gender,race2)
+
 population_counts$race = factor(population_counts$race, 
                                 levels = c("hispanic", "asian","white","black","other"))
 population_counts = population_counts %>%
-  arrange(sex,race) %>%
-  ungroup %>%
-  filter(race == 'hispanic'| 
-           race == 'white' | 
-           race == 'asian' | 
-           (race == 'black' & sex == 'Male'))
-
+  arrange(sex,race) 
+  
+population_counts
+pew_rep
 
 
 pew_rep[,3:7] =pew_rep[,3:7] * replicate(5,population_counts$group_weight)
@@ -176,20 +193,20 @@ pewplot2_corrected_sex = pewplot2
 pewplot2_corrected_sex$pew_estimate = pew_rep_corrected_sex
 pewplot2_corrected_sex$sample = 'mturk_corrected_gender'
 
-
-
 #Comparing Pew data to Mturk, mturk correced for gender and mturk corrected for race and gender
 pplot_corr = rbind(pewplot,pewplot2,pewplot2_corrected_sex,pewplot2_corrected)
 
 pplot_corr$sample = factor(pplot_corr$sample, levels = c('pew', 
-                                               'mturk',
-                                               'mturk_corrected_gender',
-                                               'mturk_corrected_race_gender'),
+                                                         'mturk',
+                                                         'mturk_corrected_gender',
+                                                         'mturk_corrected_race_gender'),
                            labels = c('pew', 
-                                               'mturk',
-                                               'mturk_corrected\n_gender',
-                                               'mturk_corrected\n_race_gender'))
+                                      'mturk',
+                                      'mturk_corrected\n_gender',
+                                      'mturk_corrected\n_race_gender'))
 pplot_corr %>%
   ggplot(.) +
   geom_col(aes(x = qid, y= pew_estimate, fill = sample), position = position_dodge()) + 
   theme_minimal()
+
+
